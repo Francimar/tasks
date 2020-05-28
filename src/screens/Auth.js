@@ -4,23 +4,78 @@ import {
   Text,
   StyleSheet,
   View,
-  TextInput,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 
+import axios from 'axios';
+
 import backgroundImage from '../../assets/imgs/login.jpg';
+import AuthInput from '../components/AuthInput';
 import commonStyles from '../commonStyles';
+import { server, showError, showSuccess } from '../common';
+
+const initialState = {
+  name: '',
+  email: 'fcm@gmail.com',
+  password: '1234',
+  confirmPassword: '',
+  stageNew: false,
+};
 
 export default class Auth extends Component {
   state = {
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    stageNew: true,
+    ...initialState,
+  };
+
+  signinOrSignup = () => {
+    if (this.state.stageNew) {
+      this.signup();
+    } else {
+      this.signin();
+    }
+  };
+
+  signup = async () => {
+    try {
+      await axios.post(`${server}/signup`, {
+        name: this.state.name,
+        email: this.state.email,
+        password: this.state.password,
+        confirmPassword: this.state.confirmPassword,
+      });
+
+      showSuccess('Usuário Cadastrado!');
+      this.setState({ ...initialState });
+    } catch (e) {
+      showError(e);
+    }
+  };
+
+  signin = async () => {
+    try {
+      const res = await axios.post(`${server}/signin`, {
+        email: this.state.email,
+        password: this.state.password,
+      });
+      axios.defaults.headers.common[
+        'Authorization'
+      ] = `bearer ${res.data.token}`;
+      this.props.navigation.navigate('Home');
+    } catch (e) {
+      showError(e);
+    }
   };
 
   render() {
+    const validations = [];
+    validations.push(this.state.email && this.state.email.includes('@'));
+    validations.push(this.state.password && this.state.password.length >= 4);
+    if (this.state.stageNew) {
+      validations.push(this.state.name && this.state.name.trim().length >= 3);
+      validations.push(this.state.password === this.state.confirmPassword);
+    }
+    const validForm = validations.reduce((t, a) => t && a);
     return (
       <ImageBackground source={backgroundImage} style={styles.backgroundImage}>
         <Text style={styles.title}>Tasks</Text>
@@ -29,7 +84,8 @@ export default class Auth extends Component {
             {this.state.stageNew ? 'Crie a sua Conta' : 'Informe Login/Senha'}
           </Text>
           {this.state.stageNew && (
-            <TextInput
+            <AuthInput
+              icon="user"
               placeholder="Nome"
               value={this.state.name}
               style={styles.input}
@@ -37,13 +93,15 @@ export default class Auth extends Component {
             />
           )}
 
-          <TextInput
+          <AuthInput
+            icon="at"
             placeholder="E-mail"
             value={this.state.email}
             style={styles.input}
             onChangeText={(email) => this.setState({ email })}
           />
-          <TextInput
+          <AuthInput
+            icon="lock"
             placeholder="Senha"
             value={this.state.password}
             style={styles.input}
@@ -51,7 +109,8 @@ export default class Auth extends Component {
             onChangeText={(password) => this.setState({ password })}
           />
           {this.state.stageNew && (
-            <TextInput
+            <AuthInput
+              icon="asterisk"
               placeholder="Confirmação de Senha"
               value={this.state.confirmPassword}
               style={styles.input}
@@ -61,14 +120,29 @@ export default class Auth extends Component {
               }
             />
           )}
-          <TouchableOpacity>
-            <View style={styles.button}>
+          <TouchableOpacity onPress={this.signinOrSignup} disabled={!validForm}>
+            <View
+              style={[
+                styles.button,
+                validForm ? {} : { backgroundColor: '#AAA' },
+              ]}
+            >
               <Text style={styles.buttonText}>
                 {this.state.stageNew ? 'Cadastrar' : 'Entrar'}
               </Text>
             </View>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          style={{ padding: 10 }}
+          onPress={() => this.setState({ stageNew: !this.state.stageNew })}
+        >
+          <Text style={styles.buttonText}>
+            {this.state.stageNew
+              ? 'Já possui conta?'
+              : 'Ainda não possui conta? '}
+          </Text>
+        </TouchableOpacity>
       </ImageBackground>
     );
   }
@@ -102,13 +176,13 @@ const styles = StyleSheet.create({
   input: {
     marginTop: 10,
     backgroundColor: '#FFF',
-    padding: 10,
   },
   button: {
     backgroundColor: '#080',
     marginTop: 10,
     padding: 10,
     alignItems: 'center',
+    borderRadius: 10,
   },
   buttonText: {
     fontFamily: commonStyles.fontFamily,

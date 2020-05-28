@@ -13,12 +13,14 @@ import {
 import commonStyles from '../commonStyles.js';
 import todayImage from '../../assets/imgs/today.jpg';
 import moment from 'moment';
+import axios from 'axios';
 import 'moment/locale/pt-br';
 import Task from '../components/Task';
 import AddTask from './AddTasks';
 import EditTask from './EditTask';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import AsyncStorage from '@react-native-community/async-storage';
+import { server, showError } from '../common';
 
 const initialState = {
   showDoneTasks: true,
@@ -38,8 +40,12 @@ export default class TaskList extends Component {
 
   componentDidMount = async () => {
     const stateString = await AsyncStorage.getItem('tasksState');
-    const state = JSON.parse(stateString) || initialState;
-    this.setState(state, this.filterTasks);
+    const savedState = JSON.parse(stateString) || initialState;
+    this.setState(
+      { showDoneTasks: savedState.showDoneTasks },
+      this.filterTasks
+    );
+    this.loadTasks();
   };
 
   toggleTask = (taskId) => {
@@ -50,6 +56,16 @@ export default class TaskList extends Component {
       }
     });
     this.setState({ tasks }, this.filterTasks);
+  };
+
+  loadTasks = async () => {
+    try {
+      const maxDate = moment().format('YYYY-MM-DD 23:59:59');
+      const res = await axios.get(`${server}/tasks?date=${maxDate}`);
+      this.setState({ tasks: res.data }, this.filterTasks);
+    } catch (e) {
+      showError(e);
+    }
   };
 
   togleFilter = () => {
@@ -68,24 +84,28 @@ export default class TaskList extends Component {
       visibleTasks = this.state.tasks.filter(pending);
     }
     this.setState({ visibleTasks });
-    AsyncStorage.setItem('tasksState', JSON.stringify(this.state));
+    AsyncStorage.setItem(
+      'tasksState',
+      JSON.stringify({
+        showDoneTasks: this.state.showDoneTasks,
+      })
+    );
   };
 
-  addTask = (newTask) => {
+  addTask = async (newTask) => {
     if (!newTask.desc || !newTask.desc.trim()) {
       Alert.alert('Dados Inválidos', 'Descrição não informada');
       return;
     }
-
-    const tasks = [...this.state.tasks];
-    tasks.push({
-      id: Math.random(),
-      desc: newTask.desc,
-      estimatedAt: newTask.date,
-      doneAt: null,
-    });
-
-    this.setState({ tasks, showAddTask: false }, this.filterTasks);
+    try {
+      await axios.post(`${server}/tasks`, {
+        desc: newTask.desc,
+        estimatedAt: newTask.date,
+      });
+      this.setState({ showAddTask: false }, this.loadTasks);
+    } catch (error) {
+      showError(error);
+    }
   };
 
   deleteTask = (id) => {
