@@ -78,7 +78,11 @@ export default (props) => {
 
         <View>
           <Text style={[styles.desc, doneOrNotStyle]}>{props.desc}</Text>
-          <Text style={styles.date}>{formatedDate}</Text>
+          <Text style={styles.date}>
+            {moment(props.estimateAt)
+              .locale('pt-br')
+              .format('ddd, D [de] MMMM [de] YYYY')}
+          </Text>
         </View>
       </View>
     </Swipeable>

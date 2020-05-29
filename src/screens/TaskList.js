@@ -48,19 +48,20 @@ export default class TaskList extends Component {
     this.loadTasks();
   };
 
-  toggleTask = (taskId) => {
-    const tasks = [...this.state.tasks];
-    tasks.forEach((task) => {
-      if (task.id === taskId) {
-        task.doneAt = task.doneAt ? null : new Date();
-      }
-    });
-    this.setState({ tasks }, this.filterTasks);
+  toggleTask = async (taskId) => {
+    try {
+      await axios.put(`${server}/tasks/${taskId}/toggle`);
+      this.loadTasks();
+    } catch (error) {
+      showError(error);
+    }
   };
 
   loadTasks = async () => {
     try {
-      const maxDate = moment().format('YYYY-MM-DD 23:59:59');
+      const maxDate = moment()
+        .add({ days: this.props.daysAhead })
+        .format('YYYY-MM-DD 23:59:59');
       const res = await axios.get(`${server}/tasks?date=${maxDate}`);
       this.setState({ tasks: res.data }, this.filterTasks);
     } catch (e) {
@@ -100,7 +101,7 @@ export default class TaskList extends Component {
     try {
       await axios.post(`${server}/tasks`, {
         desc: newTask.desc,
-        estimatedAt: newTask.date,
+        estimateAt: newTask.date,
       });
       this.setState({ showAddTask: false }, this.loadTasks);
     } catch (error) {
@@ -108,9 +109,13 @@ export default class TaskList extends Component {
     }
   };
 
-  deleteTask = (id) => {
-    const tasks = this.state.tasks.filter((task) => task.id != id);
-    this.setState({ tasks }, this.filterTasks);
+  deleteTask = async (taskId) => {
+    try {
+      await axios.delete(`${server}/tasks/${taskId}`);
+      this.loadTasks();
+    } catch (error) {
+      showError(error);
+    }
   };
 
   update = (id) => {
@@ -155,6 +160,15 @@ export default class TaskList extends Component {
         />
         <ImageBackground source={todayImage} style={styles.background}>
           <View style={styles.iconBar}>
+            <TouchableOpacity
+              onPress={() => this.props.navigation.openDrawer()}
+            >
+              <Icon
+                name="bars"
+                size={20}
+                color={commonStyles.colors.secundary}
+              />
+            </TouchableOpacity>
             <TouchableOpacity onPress={this.togleFilter}>
               <Icon
                 name={this.state.showDoneTasks ? 'eye' : 'eye-slash'}
@@ -164,7 +178,7 @@ export default class TaskList extends Component {
             </TouchableOpacity>
           </View>
           <View style={styles.titleBar}>
-            <Text style={styles.title}>Hoje</Text>
+            <Text style={styles.title}>{this.props.title}</Text>
             <Text style={styles.subTitle}>{today}</Text>
           </View>
         </ImageBackground>
@@ -226,7 +240,7 @@ const styles = StyleSheet.create({
   iconBar: {
     flexDirection: 'row',
     marginHorizontal: 20,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     marginTop: Platform.OS === 'ios' ? 40 : 10,
   },
   addButton: {
